@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CalendarConfig, Shift } from '../types'
-import { CALENDAR_KEY, DEFAULT_CALENDAR_CONFIG, SHIFTS_KEY, loadCalendarConfig, loadShifts, writeJson } from '../lib/storage'
-import { diffMinutes } from '../lib/time'
+import type { Absence, CalendarConfig, Shift, ShiftBreak, WorkSettings } from '../types'
+import {
+  ABSENCES_KEY,
+  CALENDAR_KEY,
+  DEFAULT_CALENDAR_CONFIG,
+  SETTINGS_KEY,
+  SHIFTS_KEY,
+  loadAbsences,
+  loadCalendarConfig,
+  loadSettings,
+  loadShifts,
+  writeJson,
+} from '../lib/storage'
+import { netMinutes } from '../lib/time'
 import {
   CalendarApiError,
   GOOGLE_CLIENT_ID,
@@ -11,6 +22,7 @@ import {
   revokeToken,
   upsertShiftEvent,
 } from '../lib/googleCalendar'
+import { downloadMonthlyReport } from '../lib/pdfReport'
 
 function createId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -24,9 +36,13 @@ function nowIso(): string {
   return date.toISOString()
 }
 
+const sameBreaks = (a: ShiftBreak[], b: ShiftBreak[]) => JSON.stringify(a) === JSON.stringify(b)
+
 export function useTimeTracking() {
   const [shifts, setShifts] = useState<Shift[]>(loadShifts)
   const [calendar, setCalendar] = useState<CalendarConfig>(loadCalendarConfig)
+  const [settings, setSettings] = useState<WorkSettings>(loadSettings)
+  const [absences, setAbsences] = useState<Absence[]>(loadAbsences)
   const [syncingIds, setSyncingIds] = useState<Set<string>>(() => new Set())
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -40,6 +56,8 @@ export function useTimeTracking() {
 
   useEffect(() => writeJson(SHIFTS_KEY, shifts), [shifts])
   useEffect(() => writeJson(CALENDAR_KEY, calendar), [calendar])
+  useEffect(() => writeJson(SETTINGS_KEY, settings), [settings])
+  useEffect(() => writeJson(ABSENCES_KEY, absences), [absences])
 
   useEffect(() => {
     if (GOOGLE_CLIENT_ID) loadGoogleIdentity().catch(() => undefined)
@@ -53,11 +71,29 @@ export function useTimeTracking() {
       id: createId(),
       startAt: nowIso(),
       endAt: null,
+      breaks: [],
       durationMinutes: 0,
       synced: false,
       calendarEventId: null,
     }
     setShifts((prev) => [...prev, shift])
+  }, [])
+
+  const startBreak = useCallback(() => {
+    setShifts((prev) =>
+      prev.map((s) =>
+        s.endAt === null && !s.breaks.some((b) => b.endAt === null)
+          ? { ...s, breaks: [...s.breaks, { startAt: nowIso(), endAt: null }] }
+          : s,
+      ),
+    )
+  }, [])
+
+  const endBreak = useCallback(() => {
+    const endAt = nowIso()
+    setShifts((prev) =>
+      prev.map((s) => (s.endAt === null ? { ...s, breaks: s.breaks.map((b) => (b.endAt === null ? { ...b, endAt } : b)) } : s)),
+    )
   }, [])
 
   /** Gets a usable token. Opens the Google popup if needed, so call it synchronously from a click. */
@@ -84,14 +120,12 @@ export function useTimeTracking() {
             try {
               const eventId = await upsertShiftEvent(shift, calendarRef.current.calendarId, token)
               setShifts((prev) =>
-                prev.map((s) =>
+                prev.map((s) => {
+                  if (s.id !== shift.id) return s
                   // Only mark as synced if the shift wasn't edited while the request was in flight.
-                  s.id === shift.id && s.startAt === shift.startAt && s.endAt === shift.endAt
-                    ? { ...s, synced: true, calendarEventId: eventId }
-                    : s.id === shift.id
-                      ? { ...s, calendarEventId: eventId }
-                      : s,
-                ),
+                  const unchanged = s.startAt === shift.startAt && s.endAt === shift.endAt && sameBreaks(s.breaks, shift.breaks)
+                  return unchanged ? { ...s, synced: true, calendarEventId: eventId } : { ...s, calendarEventId: eventId }
+                }),
               )
             } catch (error) {
               failures++
@@ -122,27 +156,29 @@ export function useTimeTracking() {
     [ensureToken],
   )
 
-  /** Closes the open shift and, if Calendar is connected, creates its event. Returns the closed shift id. */
+  /** Closes the open shift (and any open break) and, if Calendar is connected, creates its event. */
   const clockOut = useCallback((): string | null => {
     const open = shiftsRef.current.find((s) => s.endAt === null)
     if (!open) return null
     const endAt = nowIso()
-    const closed: Shift = { ...open, endAt, durationMinutes: diffMinutes(open.startAt, endAt) }
+    const breaks = open.breaks.map((b) => (b.endAt === null ? { ...b, endAt } : b))
+    const closed: Shift = { ...open, endAt, breaks, durationMinutes: netMinutes(open.startAt, endAt, breaks) }
     setShifts((prev) => prev.map((s) => (s.id === open.id ? closed : s)))
     if (calendarRef.current.connected) void syncShifts([closed])
     return closed.id
   }, [syncShifts])
 
   /** Saves edited times locally. A changed shift goes back to "Pendiente" until it is synced again. */
-  const updateShift = useCallback((id: string, startAt: string, endAt: string): Shift | null => {
+  const updateShift = useCallback((id: string, startAt: string, endAt: string, breaks: ShiftBreak[]): Shift | null => {
     const existing = shiftsRef.current.find((s) => s.id === id)
     if (!existing) return null
-    const changed = existing.startAt !== startAt || existing.endAt !== endAt
+    const changed = existing.startAt !== startAt || existing.endAt !== endAt || !sameBreaks(existing.breaks, breaks)
     const updated: Shift = {
       ...existing,
       startAt,
       endAt,
-      durationMinutes: diffMinutes(startAt, endAt),
+      breaks,
+      durationMinutes: netMinutes(startAt, endAt, breaks),
       synced: changed ? false : existing.synced,
     }
     setShifts((prev) => prev.map((s) => (s.id === id ? updated : s)))
@@ -171,20 +207,50 @@ export function useTimeTracking() {
     setCalendar((prev) => ({ ...prev, calendarId: calendarId.trim() || 'primary' }))
   }, [])
 
+  const updateSettings = useCallback((patch: Partial<WorkSettings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }))
+  }, [])
+
+  const addAbsence = useCallback((absence: Omit<Absence, 'id'>) => {
+    setAbsences((prev) => [...prev, { ...absence, id: createId() }])
+    setMessage({ kind: 'ok', text: absence.type === 'vacation' ? 'Vacaciones guardadas' : 'Ausencia guardada' })
+  }, [])
+
+  const removeAbsence = useCallback((id: string) => {
+    setAbsences((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
+  const exportMonth = useCallback(
+    (year: number, month: number) => {
+      downloadMonthlyReport({ shifts: shiftsRef.current, absences, settings, year, month }).catch((error: unknown) => {
+        setMessage({ kind: 'error', text: `No se pudo generar el PDF: ${error instanceof Error ? error.message : 'error desconocido'}` })
+      })
+    },
+    [absences, settings],
+  )
+
   return {
     shifts,
     openShift,
     calendar,
+    settings,
+    absences,
     syncingIds,
     message,
     clearMessage: () => setMessage(null),
     clockIn,
     clockOut,
+    startBreak,
+    endBreak,
     updateShift,
     syncShifts,
     connectCalendar,
     disconnectCalendar,
     setCalendarId,
+    updateSettings,
+    addAbsence,
+    removeAbsence,
+    exportMonth,
     hasClientId: !!GOOGLE_CLIENT_ID,
   }
 }

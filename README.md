@@ -47,6 +47,16 @@ Correspondencia con el modelo de la especificación: `fechaInicio → startAt`, 
 - Los totales de Hoy/Semana/Mes/Año suman turnos cerrados; un turno que cruza medianoche se reparte entre los días.
 - Los turnos *Pendientes* se pueden sincronizar uno a uno o todos desde el Historial.
 
+## Funciones del contrato
+
+- **Descansos**: botón *Iniciar/Terminar descanso* durante el turno. Los descansos se descuentan del tiempo trabajado y se pueden editar en *Ajustar turno*.
+- **Contador anual**: horas ordinarias hechas frente al objetivo del año (proporcional si el contrato empezó este año) y si vas por encima o por debajo del ritmo. Admite un saldo inicial con las horas hechas antes de usar la app.
+- **Horas complementarias**: dentro de cada semana (lunes a domingo) las primeras *N* horas son ordinarias y el resto complementarias. Aviso al llegar al 80 % y al 100 % del máximo anual.
+- **Vacaciones y ausencias**: vacaciones por rango de días naturales con contador de días restantes; visitas médicas, permisos y bajas con horas opcionales y nota.
+- **PDF mensual**: registro día a día (entrada, salida, descansos, ordinarias y complementarias) más las ausencias del mes.
+
+Las cifras (horas anuales, máximo de complementarias, umbral semanal, días de vacaciones) se configuran en *Ajustes* y solo se guardan en el dispositivo.
+
 ## Seguridad y limitaciones
 
 - El access token de Google se guarda en `localStorage` (requisito de la especificación). Cualquier script que corra en tu dominio (XSS, una dependencia comprometida) podría leerlo y acceder a tus eventos durante su validez (~1 h). Se mitiga pidiendo solo el scope `calendar.events`, sin refresh token, y revocándolo al desconectar. Para producción con más usuarios, lo correcto es un backend (p. ej. Supabase Edge Functions) con el flujo *authorization code*.

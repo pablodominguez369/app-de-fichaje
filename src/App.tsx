@@ -5,7 +5,8 @@ import { ClockScreen } from './components/ClockScreen'
 import { SummaryScreen } from './components/SummaryScreen'
 import { HistoryScreen } from './components/HistoryScreen'
 import { AdjustShiftScreen } from './components/AdjustShiftScreen'
-import { CalendarScreen } from './components/CalendarScreen'
+import { SettingsScreen } from './components/SettingsScreen'
+import { AbsencesScreen } from './components/AbsencesScreen'
 import { TabBar } from './components/TabBar'
 
 export default function App() {
@@ -40,7 +41,7 @@ export default function App() {
         <button
           type="button"
           className={`calendar-chip ${tracking.calendar.connected ? 'calendar-chip--on' : ''}`}
-          onClick={() => changeTab('calendar')}
+          onClick={() => changeTab('settings')}
         >
           <span className="status-dot" aria-hidden />
           {tracking.calendar.connected ? 'Calendar conectado' : 'Calendar desconectado'}
@@ -54,20 +55,26 @@ export default function App() {
             shift={adjustingShift}
             syncing={tracking.syncingIds.has(adjustingShift.id)}
             calendarConnected={tracking.calendar.connected}
-            onSave={(startAt, endAt) => {
-              tracking.updateShift(adjustingShift.id, startAt, endAt)
+            onSave={(startAt, endAt, breaks) => {
+              tracking.updateShift(adjustingShift.id, startAt, endAt, breaks)
               setAdjustingId(null)
             }}
-            onSaveAndSync={(startAt, endAt) => {
-              const updated = tracking.updateShift(adjustingShift.id, startAt, endAt)
+            onSaveAndSync={(startAt, endAt, breaks) => {
+              const updated = tracking.updateShift(adjustingShift.id, startAt, endAt, breaks)
               if (updated) void tracking.syncShifts([updated])
             }}
             onClose={() => setAdjustingId(null)}
           />
         ) : tab === 'clock' ? (
-          <ClockScreen openShift={tracking.openShift} onClockIn={tracking.clockIn} onClockOut={handleClockOut} />
+          <ClockScreen
+            openShift={tracking.openShift}
+            onClockIn={tracking.clockIn}
+            onClockOut={handleClockOut}
+            onStartBreak={tracking.startBreak}
+            onEndBreak={tracking.endBreak}
+          />
         ) : tab === 'summary' ? (
-          <SummaryScreen shifts={tracking.shifts} />
+          <SummaryScreen shifts={tracking.shifts} settings={tracking.settings} onExport={tracking.exportMonth} />
         ) : tab === 'history' ? (
           <HistoryScreen
             shifts={tracking.shifts}
@@ -75,14 +82,23 @@ export default function App() {
             onSync={(shifts) => void tracking.syncShifts(shifts)}
             onEdit={setAdjustingId}
           />
+        ) : tab === 'absences' ? (
+          <AbsencesScreen
+            absences={tracking.absences}
+            settings={tracking.settings}
+            onAdd={tracking.addAbsence}
+            onRemove={tracking.removeAbsence}
+          />
         ) : (
-          <CalendarScreen
+          <SettingsScreen
             calendar={tracking.calendar}
+            settings={tracking.settings}
             hasClientId={tracking.hasClientId}
             pendingCount={pendingCount}
             onConnect={tracking.connectCalendar}
             onDisconnect={tracking.disconnectCalendar}
             onCalendarIdChange={tracking.setCalendarId}
+            onSettingsChange={tracking.updateSettings}
           />
         )}
       </main>
