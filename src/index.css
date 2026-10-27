@@ -13,6 +13,8 @@
   --amber: #b45309;
   --amber-soft: #fef3c7;
   --blue: #2563eb;
+  --blue-soft: #dbeafe;
+  --track: #e9ebef;
   --radius: 16px;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.06);
   --tab-height: 64px;
@@ -34,6 +36,8 @@
     --red-soft: #3b1515;
     --amber: #fbbf24;
     --amber-soft: #3a2d0c;
+    --blue-soft: #172554;
+    --track: #2a2e36;
     --shadow: none;
     color-scheme: dark;
   }
@@ -49,6 +53,8 @@
   --red-soft: #3b1515;
   --amber: #fbbf24;
   --amber-soft: #3a2d0c;
+  --blue-soft: #172554;
+  --track: #2a2e36;
   --shadow: none;
   color-scheme: dark;
 }
@@ -618,4 +624,222 @@ code {
   font-size: 0.68rem;
   display: grid;
   place-items: center;
+}
+
+/* ---------- Breaks ---------- */
+.status-pill--break {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.break-button {
+  min-width: 200px;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.break-button--active {
+  background: var(--amber-soft);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.time-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.breaks-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breaks-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.break-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.field__input--small,
+.field__input[type='time'].field__input--small {
+  font-size: 1.1rem;
+  padding: 8px 10px;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* ---------- Panels & progress ---------- */
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel--warning {
+  outline: 1px solid var(--amber);
+}
+
+.panel--danger {
+  outline: 1px solid var(--red);
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panel__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.panel__figure {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: visible;
+}
+
+.progress--thin {
+  height: 6px;
+}
+
+.progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 0.3s ease;
+}
+
+.progress__fill--warning {
+  background: var(--amber);
+}
+
+.progress__fill--danger {
+  background: var(--red);
+}
+
+.progress__marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.kv dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.alert--danger {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field--grow {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* ---------- Absences & settings ---------- */
+.badge--neutral {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.absence-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.absence-dates {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+select.field__input {
+  appearance: auto;
+}
+
+.settings-grid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+@media (max-width: 360px) {
+  .settings-grid,
+  .time-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill--in .status-dot {
+    animation: none;
+  }
+  .progress__fill,
+  .punch-button {
+    transition: none;
+  }
 }

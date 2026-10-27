@@ -1,4 +1,5 @@
 import type { CalendarConfig, Shift } from '../types'
+import { formatMinutes, formatTime } from './time'
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
 const SCOPE = 'https://www.googleapis.com/auth/calendar.events'
@@ -104,13 +105,22 @@ export class CalendarApiError extends Error {
   }
 }
 
+function buildDescription(shift: Shift): string {
+  const lines = [`Tiempo trabajado: ${formatMinutes(shift.durationMinutes)}`]
+  for (const b of shift.breaks) {
+    if (b.endAt) lines.push(`Descanso: ${formatTime(b.startAt)}–${formatTime(b.endAt)}`)
+  }
+  lines.push('Registrado con la app de fichaje.')
+  return lines.join('\n')
+}
+
 function buildEventBody(shift: Shift) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   return {
     summary: 'Turno de trabajo',
     // Restores the event if the user had deleted it in Calendar (PATCH on a cancelled event).
     status: 'confirmed',
-    description: 'Registrado con la app de fichaje.',
+    description: buildDescription(shift),
     start: { dateTime: shift.startAt, timeZone },
     end: { dateTime: shift.endAt, timeZone },
     extendedProperties: { private: { fichajeShiftId: shift.id } },

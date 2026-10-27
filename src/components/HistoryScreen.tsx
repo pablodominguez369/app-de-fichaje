@@ -1,5 +1,5 @@
 import type { Shift } from '../types'
-import { dayKey, formatDayLabel, formatMinutes, formatTime } from '../lib/time'
+import { breakMinutes, dayKey, formatDayLabel, formatMinutes, formatTime } from '../lib/time'
 import { SyncBadge } from './SyncBadge'
 
 interface Props {
@@ -54,6 +54,11 @@ export function HistoryScreen({ shifts, syncingIds, onSync, onEdit }: Props) {
                       </div>
                       <span className="shift-row__total">{shift.endAt ? formatMinutes(shift.durationMinutes) : '—'}</span>
                     </div>
+                    {shift.endAt && shift.breaks.length > 0 && (
+                      <span className="hint">
+                        {shift.breaks.length} descanso{shift.breaks.length > 1 ? 's' : ''} · {formatMinutes(breakMinutes(shift))} descontados
+                      </span>
+                    )}
                     {shift.endAt && (
                       <div className="shift-row__actions">
                         <SyncBadge synced={shift.synced} />
