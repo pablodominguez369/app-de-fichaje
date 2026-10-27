@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Absence, Shift, WorkSettings } from '../types'
 import { annualProgress, splitShifts } from './hours'
 import { vacationDaysUsed } from './absences'
-import { DEFAULT_SETTINGS } from './storage'
+import { DEFAULT_SETTINGS, parseSettingsLink } from './storage'
 
 const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m - 1, d, h, min)
 
@@ -75,5 +75,14 @@ describe('opening balance', () => {
     expect(annualProgress([], withBalance, at(2026, 10, 28)).ordinaryMinutes).toBe(300 * 60)
     expect(annualProgress([], withBalance, at(2026, 10, 28)).complementaryMinutes).toBe(10 * 60)
     expect(annualProgress([], withBalance, at(2027, 2, 1)).ordinaryMinutes).toBe(0)
+  })
+})
+
+describe('parseSettingsLink', () => {
+  it('reads valid settings and ignores the rest', () => {
+    const hash = '#ajustes=' + encodeURIComponent(JSON.stringify({ annualHours: 900, contractStart: '2026-05-08', openingOrdinaryHours: -3, foo: 1 }))
+    expect(parseSettingsLink(hash)).toEqual({ annualHours: 900, contractStart: '2026-05-08' })
+    expect(parseSettingsLink('#ajustes=%7Bbroken')).toBeNull()
+    expect(parseSettingsLink('#otra-cosa')).toBeNull()
   })
 })

@@ -87,3 +87,42 @@ export function loadAbsences(): Absence[] {
     ? data.filter((a): a is Absence => isRecord(a) && typeof a.id === 'string' && typeof a.startDate === 'string')
     : []
 }
+
+export const SETTINGS_LINK_PREFIX = '#ajustes='
+
+const NUMERIC_SETTINGS = [
+  'annualHours',
+  'maxComplementaryHours',
+  'weeklyThresholdHours',
+  'vacationDays',
+  'openingOrdinaryHours',
+  'openingComplementaryHours',
+  'openingBalanceYear',
+] as const
+const TEXT_SETTINGS = ['contractStart', 'employeeName', 'companyName'] as const
+
+/**
+ * Reads settings from a setup link like `/#ajustes={"annualHours":900,...}`.
+ * The hash never reaches the server, so personal figures stay on the device.
+ * Unknown keys and invalid values are ignored.
+ */
+export function parseSettingsLink(hash: string): Partial<WorkSettings> | null {
+  if (!hash.startsWith(SETTINGS_LINK_PREFIX)) return null
+  try {
+    const data: unknown = JSON.parse(decodeURIComponent(hash.slice(SETTINGS_LINK_PREFIX.length)))
+    if (!isRecord(data)) return null
+    const patch: Partial<WorkSettings> = {}
+    for (const key of NUMERIC_SETTINGS) {
+      const value = data[key]
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) patch[key] = value
+    }
+    for (const key of TEXT_SETTINGS) {
+      const value = data[key]
+      if (typeof value === 'string') patch[key] = value.slice(0, 120)
+    }
+    if (patch.contractStart !== undefined && !/^(\d{4}-\d{2}-\d{2})?$/.test(patch.contractStart)) delete patch.contractStart
+    return Object.keys(patch).length > 0 ? patch : null
+  } catch {
+    return null
+  }
+}

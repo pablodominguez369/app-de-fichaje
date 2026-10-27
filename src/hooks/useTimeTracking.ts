@@ -10,6 +10,8 @@ import {
   loadCalendarConfig,
   loadSettings,
   loadShifts,
+  SETTINGS_LINK_PREFIX,
+  parseSettingsLink,
   writeJson,
 } from '../lib/storage'
 import { netMinutes } from '../lib/time'
@@ -36,15 +38,20 @@ function nowIso(): string {
   return date.toISOString()
 }
 
+/** Settings from a setup link (/#ajustes=...), read once when the app loads. */
+const setupLink = typeof window === 'undefined' ? null : parseSettingsLink(window.location.hash)
+
 const sameBreaks = (a: ShiftBreak[], b: ShiftBreak[]) => JSON.stringify(a) === JSON.stringify(b)
 
 export function useTimeTracking() {
   const [shifts, setShifts] = useState<Shift[]>(loadShifts)
   const [calendar, setCalendar] = useState<CalendarConfig>(loadCalendarConfig)
-  const [settings, setSettings] = useState<WorkSettings>(loadSettings)
+  const [settings, setSettings] = useState<WorkSettings>(() => (setupLink ? { ...loadSettings(), ...setupLink } : loadSettings()))
   const [absences, setAbsences] = useState<Absence[]>(loadAbsences)
   const [syncingIds, setSyncingIds] = useState<Set<string>>(() => new Set())
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(() =>
+    setupLink ? { kind: 'ok', text: 'Datos de tu contrato cargados en Ajustes' } : null,
+  )
 
   // Refs give async callbacks the latest state without re-creating them.
   const calendarRef = useRef(calendar)
@@ -61,6 +68,13 @@ export function useTimeTracking() {
 
   useEffect(() => {
     if (GOOGLE_CLIENT_ID) loadGoogleIdentity().catch(() => undefined)
+  }, [])
+
+  // The setup link was applied in the initial state; remove it from the address bar.
+  useEffect(() => {
+    if (window.location.hash.startsWith(SETTINGS_LINK_PREFIX)) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
   }, [])
 
   const openShift = useMemo(() => shifts.find((s) => s.endAt === null) ?? null, [shifts])
